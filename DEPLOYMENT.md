@@ -168,7 +168,7 @@ docker-compose up --build
 - Check EC2 security group allows ports 8000 and 3000
 - On EC2: `docker ps` to verify containers are running
 - On EC2: `curl http://localhost:8000` to test locally
-
+test
 **Docker Hub push fails:**
 - Verify DOCKER_USERNAME and DOCKER_PASSWORD
 - Use Docker Hub Access Token, not account password
