@@ -149,12 +149,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup SSH key
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          # Fix line endings (Windows CRLF -> Unix LF) and write key to file
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > deploy_key.pem
+          chmod 600 deploy_key.pem
+
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key_path: ./deploy_key.pem
           script: |
             set -e
             cd ~/studentsinfo || (mkdir -p ~/studentsinfo && cd ~/studentsinfo)
