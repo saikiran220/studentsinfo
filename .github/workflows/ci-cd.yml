@@ -149,54 +149,51 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup SSH key
+      - name: Deploy to EC2 via SSH
         env:
           SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
         run: |
-          # Fix line endings (Windows CRLF -> Unix LF) and write key to file
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # Write key with proper format
           printf '%s\n' "$SSH_KEY" | tr -d '\r' > deploy_key.pem
           chmod 600 deploy_key.pem
 
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key_path: ./deploy_key.pem
-          script: |
+          # Add EC2 to known_hosts
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # Deploy
+          ssh -i deploy_key.pem -o StrictHostKeyChecking=accept-new \
+            "${EC2_USER}@${EC2_HOST}" 'bash -s' << 'DEPLOY_SCRIPT'
             set -e
             cd ~/studentsinfo || (mkdir -p ~/studentsinfo && cd ~/studentsinfo)
 
-            # Login to Docker Hub (for private images) - skip if public
-            # echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin || true
+            docker pull saikiranbolakonda/studentsinfo-backend:latest
+            docker pull saikiranbolakonda/studentsinfo-frontend:latest
 
-            # Pull latest images
-            docker pull ${{ env.BACKEND_IMAGE }}:latest
-            docker pull ${{ env.FRONTEND_IMAGE }}:latest
-
-            # Stop and remove old containers
             docker stop studentsinfo-backend studentsinfo-frontend 2>/dev/null || true
             docker rm studentsinfo-backend studentsinfo-frontend 2>/dev/null || true
 
-            # Create network if not exists
             docker network create studentsinfo-network 2>/dev/null || true
 
-            # Run backend
             docker run -d \
               --name studentsinfo-backend \
               --network studentsinfo-network \
               -p 8000:8000 \
               --env-file ~/studentsinfo/backend/.env \
               --restart unless-stopped \
-              ${{ env.BACKEND_IMAGE }}:latest
+              saikiranbolakonda/studentsinfo-backend:latest
 
-            # Run frontend
             docker run -d \
               --name studentsinfo-frontend \
               --network studentsinfo-network \
               -p 3000:80 \
               --restart unless-stopped \
-              ${{ env.FRONTEND_IMAGE }}:latest
+              saikiranbolakonda/studentsinfo-frontend:latest
 
             echo "Deployment complete!"
             docker ps
+          DEPLOY_SCRIPT
