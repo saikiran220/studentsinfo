@@ -169,8 +169,15 @@ jobs:
             exit 1
           fi
 
-          # Write key: handle Windows line endings, preserve PEM structure
-          printf '%s' "$SSH_KEY" | tr -d '\r' > deploy_key.pem
+          # Write key: support raw PEM or base64-encoded (base64 avoids multiline secret corruption)
+          if printf '%s' "$SSH_KEY" | grep -q "BEGIN.*PRIVATE KEY"; then
+            printf '%s' "$SSH_KEY" | tr -d '\r' > deploy_key.pem
+          else
+            printf '%s' "$SSH_KEY" | tr -d '\r\n ' | base64 -d > deploy_key.pem 2>/dev/null || {
+              echo "::error::EC2_SSH_KEY invalid. Use raw PEM or base64. See DEPLOYMENT.md"
+              exit 1
+            }
+          fi
           chmod 600 deploy_key.pem
 
           # Verify key file
@@ -185,7 +192,7 @@ jobs:
 
           # Validate key with ssh-keygen (catches format/password issues)
           if ! ssh-keygen -y -f deploy_key.pem > /dev/null 2>&1; then
-            echo "::error::EC2_SSH_KEY is invalid or corrupted. Re-copy the full .pem from EC2 key pair."
+            echo "::error::EC2_SSH_KEY invalid. Try base64: certutil -encode sai-kiran.pem temp.b64"
             exit 1
           fi
           echo "SSH key validated successfully"

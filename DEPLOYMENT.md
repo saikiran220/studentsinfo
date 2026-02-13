@@ -39,7 +39,15 @@ Git Push → GitHub Actions → Build Docker Images → Push to Docker Hub → D
 **Or** add them as **Repository secrets** (Settings → Secrets and variables → Actions).
 
 **Docker Hub token:** Account Settings → Security → New Access Token  
-**EC2 SSH key:** Open `.pem` in Notepad → Select All → Copy. Paste exactly (including `-----BEGIN...` and `-----END...`)
+
+**EC2 SSH key (recommended – base64 avoids multiline corruption):**
+```powershell
+# In PowerShell, from project folder:
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Users\Admin\Downloads\sai-kiran.pem"))
+```
+Copy the output (single line) and paste into `EC2_SSH_KEY`.
+
+**Alternative (raw PEM):** Paste the full `.pem` content including `-----BEGIN...` and `-----END...`. If SSH still fails, use base64 instead.
 
 ---
 
@@ -162,9 +170,13 @@ docker-compose up --build
 
 ## Troubleshooting
 
-**Deploy job fails:**
-- Verify `EC2_SSH_KEY`, `EC2_HOST`, `EC2_USER`, `DOCKER_PASSWORD` are in **production** environment secrets
-- Re-paste `EC2_SSH_KEY`: full `.pem` content, no extra spaces, from `-----BEGIN` to `-----END`
+**Deploy job fails with "unable to authenticate":**
+- **Use base64 for EC2_SSH_KEY** – GitHub often corrupts multiline PEM. Run in PowerShell:
+  ```powershell
+  [Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\sai-kiran.pem"))
+  ```
+  Paste the single-line output into `EC2_SSH_KEY` and update the secret.
+- Verify secrets are in **production** environment (Settings → Environments → production)
 - EC2 security group: SSH (22) must allow `0.0.0.0/0`
 - On EC2: ensure `~/studentsinfo/backend/.env` exists with `SUPABASE_URL` and `SUPABASE_KEY`
 
