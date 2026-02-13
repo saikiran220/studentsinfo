@@ -26,19 +26,20 @@ Git Push → GitHub Actions → Build Docker Images → Push to Docker Hub → D
 
 ## Step 1: Add GitHub Secrets
 
-1. Go to **GitHub repo** → **Settings** → **Secrets and variables** → **Actions**
-2. Click **New repository secret** and add:
+1. Go to **GitHub repo** → **Settings** → **Environments** → **production** (create it if needed)
+2. Add **Environment secrets** under production:
 
 | Secret Name | Value | Description |
 |-------------|-------|-------------|
-| `DOCKER_USERNAME` | saikiranbolakonda | Docker Hub username |
 | `DOCKER_PASSWORD` | your-docker-hub-token | Docker Hub Access Token |
 | `EC2_HOST` | 54.87.104.206 | EC2 public IP |
 | `EC2_USER` | ec2-user | SSH username |
-| `EC2_SSH_KEY` | (paste full private key) | SSH private key content |
+| `EC2_SSH_KEY` | (paste full .pem content) | Entire contents of your `.pem` file |
+
+**Or** add them as **Repository secrets** (Settings → Secrets and variables → Actions).
 
 **Docker Hub token:** Account Settings → Security → New Access Token  
-**EC2 SSH key:** Copy entire contents of your `.pem` file
+**EC2 SSH key:** Open `.pem` in Notepad → Select All → Copy. Paste exactly (including `-----BEGIN...` and `-----END...`)
 
 ---
 
@@ -82,11 +83,13 @@ scp -i your-key.pem docker-compose.prod.yml ec2-user@54.87.104.206:~/studentsinf
 
 Allow inbound traffic:
 
-| Type | Port | Source |
-|------|------|--------|
-| Custom TCP | 8000 | 0.0.0.0/0 |
-| Custom TCP | 3000 | 0.0.0.0/0 |
-| SSH | 22 | Your IP |
+| Type | Port | Source | Notes |
+|------|------|--------|-------|
+| Custom TCP | 8000 | 0.0.0.0/0 | Backend API |
+| Custom TCP | 3000 | 0.0.0.0/0 | Frontend |
+| SSH | 22 | 0.0.0.0/0 | **Required** for GitHub Actions deploy |
+
+> **Important:** SSH (22) must allow `0.0.0.0/0` so GitHub Actions can connect. Use your EC2 security group or key-based auth for security.
 
 AWS Console → EC2 → Instance → Security → Edit inbound rules
 
@@ -160,15 +163,16 @@ docker-compose up --build
 ## Troubleshooting
 
 **Deploy job fails:**
-- Verify all 5 GitHub secrets are set correctly
-- Ensure EC2 SSH key has correct permissions
-- Check EC2 security group allows SSH (port 22) from GitHub Actions IPs
+- Verify `EC2_SSH_KEY`, `EC2_HOST`, `EC2_USER`, `DOCKER_PASSWORD` are in **production** environment secrets
+- Re-paste `EC2_SSH_KEY`: full `.pem` content, no extra spaces, from `-----BEGIN` to `-----END`
+- EC2 security group: SSH (22) must allow `0.0.0.0/0`
+- On EC2: ensure `~/studentsinfo/backend/.env` exists with `SUPABASE_URL` and `SUPABASE_KEY`
 
 **Can't access from browser:**
 - Check EC2 security group allows ports 8000 and 3000
 - On EC2: `docker ps` to verify containers are running
 - On EC2: `curl http://localhost:8000` to test locally
-test
+
 **Docker Hub push fails:**
 - Verify DOCKER_USERNAME and DOCKER_PASSWORD
 - Use Docker Hub Access Token, not account password

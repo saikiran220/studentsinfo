@@ -202,7 +202,18 @@ jobs:
             -o ServerAliveInterval=10 \
             "${EC2_USER}@${EC2_HOST}" 'bash -s' << 'DEPLOY_SCRIPT'
             set -e
-            cd ~/studentsinfo || (mkdir -p ~/studentsinfo && cd ~/studentsinfo)
+
+            # Create project structure
+            mkdir -p ~/studentsinfo/backend
+            cd ~/studentsinfo
+
+            # Backend needs .env with SUPABASE_URL and SUPABASE_KEY
+            if [ ! -f ~/studentsinfo/backend/.env ]; then
+              echo "ERROR: ~/studentsinfo/backend/.env not found."
+              echo "SSH to EC2 and create it: nano ~/studentsinfo/backend/.env"
+              echo "Add: SUPABASE_URL=... and SUPABASE_KEY=..."
+              exit 1
+            fi
 
             docker pull saikiranbolakonda/studentsinfo-backend:latest
             docker pull saikiranbolakonda/studentsinfo-frontend:latest
