@@ -162,6 +162,17 @@ jobs:
           printf '%s\n' "$SSH_KEY" | tr -d '\r' > deploy_key.pem
           chmod 600 deploy_key.pem
 
+          # Verify key exists and has content
+          if [ ! -s deploy_key.pem ]; then
+            echo "::error::EC2_SSH_KEY secret is empty or invalid. Add the full .pem key to production environment secrets."
+            exit 1
+          fi
+          if ! grep -q "BEGIN.*PRIVATE KEY" deploy_key.pem; then
+            echo "::error::EC2_SSH_KEY does not look like a valid SSH private key."
+            exit 1
+          fi
+          echo "SSH key file is valid"
+
           # Add EC2 to known_hosts
           ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
