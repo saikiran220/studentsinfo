@@ -1,10 +1,17 @@
 version: '3.8'
 
+# Docker Compose for Students Info Application
+# For local development: Uses build context
+# For production: Comment out 'build' and uncomment 'image' lines
+
 services:
   backend:
+    # For local development - builds from source
     build:
       context: ./backend
       dockerfile: Dockerfile
+    # For production - use pre-built image from Docker Hub
+    # image: saikiranbolakonda/studentsinfo-backend:latest
     container_name: studentsinfo-backend
     ports:
       - "8000:8000"
@@ -18,9 +25,12 @@ services:
       - studentsinfo-network
 
   frontend:
+    # For local development - builds from source
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    # For production - use pre-built image from Docker Hub
+    # image: saikiranbolakonda/studentsinfo-frontend:latest
     container_name: studentsinfo-frontend
     ports:
       - "3000:80"
