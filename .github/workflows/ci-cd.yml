@@ -79,8 +79,17 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
+        env:
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u saikiranbolakonda --password-stdin
+          if [ -z "$DOCKER_PASSWORD" ]; then
+            echo "::error::DOCKER_PASSWORD secret is empty."
+            echo "FIX: Go to your repo Settings > Secrets and variables > Actions"
+            echo "Add secret: Name = DOCKER_PASSWORD, Value = your Docker Hub access token"
+            echo "NOTE: If this is a FORK, secrets do NOT work. Push to your own repo instead."
+            exit 1
+          fi
+          echo "$DOCKER_PASSWORD" | docker login -u saikiranbolakonda --password-stdin
 
       - name: Build and push backend
         uses: docker/build-push-action@v5
@@ -107,8 +116,14 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
+        env:
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u saikiranbolakonda --password-stdin
+          if [ -z "$DOCKER_PASSWORD" ]; then
+            echo "::error::DOCKER_PASSWORD secret is empty."
+            exit 1
+          fi
+          echo "$DOCKER_PASSWORD" | docker login -u saikiranbolakonda --password-stdin
 
       - name: Build and push frontend
         uses: docker/build-push-action@v5
