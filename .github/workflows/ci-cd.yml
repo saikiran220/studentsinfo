@@ -149,51 +149,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
       - name: Deploy to EC2 via SSH
         env:
-          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
         run: |
           set -e
-          mkdir -p ~/.ssh && chmod 700 ~/.ssh
-
-          # Strip whitespace from host/user
           EC2_HOST="$(echo "$EC2_HOST" | tr -d ' \r\n')"
           EC2_USER="$(echo "$EC2_USER" | tr -d ' \r\n')"
-
-          # Validate secrets
           if [ -z "$EC2_HOST" ] || [ -z "$EC2_USER" ]; then
-            echo "::error::EC2_HOST and EC2_USER required in production secrets."
+            echo "::error::EC2_HOST and EC2_USER required."
             exit 1
           fi
-          if [ -z "$SSH_KEY" ]; then
-            echo "::error::EC2_SSH_KEY required. Use base64 of .pem - see DEPLOYMENT.md"
-            exit 1
-          fi
-
-          # Decode key: base64 (recommended) or raw PEM
-          KEY_B64="$(printf '%s' "$SSH_KEY" | tr -d '\r\n\t ')"
-          if echo "$KEY_B64" | grep -q "BEGIN.*PRIVATE KEY"; then
-            printf '%s' "$SSH_KEY" | tr -d '\r' > deploy_key.pem
-          else
-            printf '%s' "$KEY_B64" | base64 -d > deploy_key.pem
-          fi
-          chmod 600 deploy_key.pem
-
-          if [ ! -s deploy_key.pem ] || ! grep -q "BEGIN.*PRIVATE KEY" deploy_key.pem; then
-            echo "::error::EC2_SSH_KEY invalid. Use base64: [Convert]::ToBase64String([IO.File]::ReadAllBytes('sai-kiran.pem'))"
-            exit 1
-          fi
-          ssh-keygen -y -f deploy_key.pem > /dev/null 2>&1 || { echo "::error::EC2_SSH_KEY invalid or wrong key pair"; exit 1; }
-          echo "SSH key OK ($(wc -c < deploy_key.pem) bytes)"
-
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
           ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-          ssh -i deploy_key.pem \
-            -o StrictHostKeyChecking=accept-new \
-            -o BatchMode=yes \
-            -o ConnectTimeout=30 \
+          ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=30 \
             "${EC2_USER}@${EC2_HOST}" 'bash -s' << 'DEPLOY_SCRIPT'
             set -e
 

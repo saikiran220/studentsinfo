@@ -3,7 +3,7 @@
 ## Quick Deploy Checklist
 
 1. **GitHub secrets** (Settings → Environments → production):
-   - `EC2_SSH_KEY` = base64 of sai-kiran.pem (PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("path\to\sai-kiran.pem"))`)
+   - `EC2_SSH_KEY` = **raw PEM content** – Open sai-kiran.pem in Notepad, Select All, Copy. Paste exactly (include `-----BEGIN RSA PRIVATE KEY-----` and `-----END RSA PRIVATE KEY-----` and all lines between).
    - `EC2_HOST` = `100.53.133.29`
    - `EC2_USER` = `ec2-user`
    - `DOCKER_PASSWORD` = Docker Hub token
@@ -50,7 +50,7 @@ Git Push → GitHub Actions → Build Docker Images → Push to Docker Hub → D
 | `DOCKER_PASSWORD` | your-docker-hub-token | Docker Hub Access Token |
 | `EC2_HOST` | 54.87.104.206 | EC2 public IP |
 | `EC2_USER` | ec2-user | SSH username |
-| `EC2_SSH_KEY` | (paste full .pem content) | Entire contents of your `.pem` file |
+| `EC2_SSH_KEY` | (paste raw PEM) | Open .pem in Notepad, copy everything including BEGIN/END lines. No base64. |
 
 **Or** add them as **Repository secrets** (Settings → Secrets and variables → Actions).
 
@@ -187,8 +187,8 @@ docker-compose up --build
 ## Troubleshooting
 
 **Deploy job fails with "unable to authenticate":**
-- **Key pair must match EC2** – In AWS Console → EC2 → Instance → Details, check "Key pair name". The `.pem` must be from that exact key pair. If the instance was launched with a different key, your key will not work.
-- **Use base64 for EC2_SSH_KEY** – GitHub often corrupts multiline PEM. Run in PowerShell:
+- **Key pair must match EC2** – In AWS Console → EC2 → Instance → Details, check "Key pair name". The `.pem` must be from that exact key pair.
+- **EC2_SSH_KEY = raw PEM** – Paste the full .pem content (all lines). Do NOT use base64. Open in Notepad, Select All, Copy, Paste into the secret. If multiline fails, try base64 instead:
   ```powershell
   [Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\sai-kiran.pem"))
   ```
