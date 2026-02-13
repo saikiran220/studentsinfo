@@ -1,0 +1,31 @@
+# Production Docker Compose - Uses images from Docker Hub
+# Deploy on EC2: docker-compose -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  backend:
+    image: saikiranbolakonda/studentsinfo-backend:latest
+    container_name: studentsinfo-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+    networks:
+      - studentsinfo-network
+
+  frontend:
+    image: saikiranbolakonda/studentsinfo-frontend:latest
+    container_name: studentsinfo-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - studentsinfo-network
+
+networks:
+  studentsinfo-network:
+    driver: bridge
