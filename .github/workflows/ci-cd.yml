@@ -155,29 +155,51 @@ jobs:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
         run: |
+          set -e
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # Write key with proper format
-          printf '%s\n' "$SSH_KEY" | tr -d '\r' > deploy_key.pem
+          # Validate required secrets
+          if [ -z "$EC2_HOST" ] || [ -z "$EC2_USER" ]; then
+            echo "::error::EC2_HOST and EC2_USER must be set in production environment secrets."
+            exit 1
+          fi
+          if [ -z "$SSH_KEY" ]; then
+            echo "::error::EC2_SSH_KEY secret is empty. Add the full .pem key to production environment secrets."
+            exit 1
+          fi
+
+          # Write key: handle Windows line endings, preserve PEM structure
+          printf '%s' "$SSH_KEY" | tr -d '\r' > deploy_key.pem
           chmod 600 deploy_key.pem
 
-          # Verify key exists and has content
+          # Verify key file
           if [ ! -s deploy_key.pem ]; then
-            echo "::error::EC2_SSH_KEY secret is empty or invalid. Add the full .pem key to production environment secrets."
+            echo "::error::EC2_SSH_KEY produced empty file. Ensure the key was pasted completely."
             exit 1
           fi
           if ! grep -q "BEGIN.*PRIVATE KEY" deploy_key.pem; then
-            echo "::error::EC2_SSH_KEY does not look like a valid SSH private key."
+            echo "::error::EC2_SSH_KEY invalid: must start with -----BEGIN (RSA|OPENSSH) PRIVATE KEY-----"
             exit 1
           fi
-          echo "SSH key file is valid"
 
-          # Add EC2 to known_hosts
+          # Validate key with ssh-keygen (catches format/password issues)
+          if ! ssh-keygen -y -f deploy_key.pem > /dev/null 2>&1; then
+            echo "::error::EC2_SSH_KEY is invalid or corrupted. Re-copy the full .pem from EC2 key pair."
+            exit 1
+          fi
+          echo "SSH key validated successfully"
+
+          # Add EC2 to known_hosts (avoid strict host key prompt)
           ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-          # Deploy
-          ssh -i deploy_key.pem -o StrictHostKeyChecking=accept-new \
+          # Deploy via SSH (BatchMode=no interactive prompts, ConnectTimeout for reliability)
+          KEY_PATH="$(pwd)/deploy_key.pem"
+          ssh -i "$KEY_PATH" \
+            -o StrictHostKeyChecking=accept-new \
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            -o ServerAliveInterval=10 \
             "${EC2_USER}@${EC2_HOST}" 'bash -s' << 'DEPLOY_SCRIPT'
             set -e
             cd ~/studentsinfo || (mkdir -p ~/studentsinfo && cd ~/studentsinfo)
