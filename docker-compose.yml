@@ -15,9 +15,6 @@ services:
     container_name: studentsinfo-backend
     ports:
       - "8000:8000"
-    environment:
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_KEY=${SUPABASE_KEY}
     env_file:
       - ./backend/.env
     restart: unless-stopped
