@@ -171,6 +171,7 @@ docker-compose up --build
 ## Troubleshooting
 
 **Deploy job fails with "unable to authenticate":**
+- **Key pair must match EC2** – In AWS Console → EC2 → Instance → Details, check "Key pair name". The `.pem` must be from that exact key pair. If the instance was launched with a different key, your key will not work.
 - **Use base64 for EC2_SSH_KEY** – GitHub often corrupts multiline PEM. Run in PowerShell:
   ```powershell
   [Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\sai-kiran.pem"))

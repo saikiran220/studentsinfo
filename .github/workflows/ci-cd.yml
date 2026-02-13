@@ -195,18 +195,22 @@ jobs:
             echo "::error::EC2_SSH_KEY invalid. Try base64: certutil -encode sai-kiran.pem temp.b64"
             exit 1
           fi
-          echo "SSH key validated successfully"
+          echo "SSH key validated successfully (key size: $(wc -c < deploy_key.pem) bytes)"
 
           # Add EC2 to known_hosts (avoid strict host key prompt)
           ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-          # Deploy via SSH (BatchMode=no interactive prompts, ConnectTimeout for reliability)
-          KEY_PATH="$(pwd)/deploy_key.pem"
-          ssh -i "$KEY_PATH" \
-            -o StrictHostKeyChecking=accept-new \
+          # Use ssh-agent for reliable key loading in CI
+          eval "$(ssh-agent -s)"
+          ssh-add deploy_key.pem
+
+          # Deploy via SSH
+          ssh -o StrictHostKeyChecking=accept-new \
             -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
             -o ConnectTimeout=30 \
             -o ServerAliveInterval=10 \
+            -i deploy_key.pem \
             "${EC2_USER}@${EC2_HOST}" 'bash -s' << 'DEPLOY_SCRIPT'
             set -e
 
