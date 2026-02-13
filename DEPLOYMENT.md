@@ -3,8 +3,12 @@
 ## Quick Deploy Checklist
 
 1. **GitHub secrets** (Settings → Environments → production):
-   - `EC2_SSH_KEY` = **raw PEM content** – Open sai-kiran.pem in Notepad, Select All, Copy. Paste exactly (include `-----BEGIN RSA PRIVATE KEY-----` and `-----END RSA PRIVATE KEY-----` and all lines between).
-   - `EC2_HOST` = `100.53.133.29`
+   - `EC2_SSH_KEY` = **base64 of .pem** (recommended – avoids multiline corruption):
+     ```powershell
+     [Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Users\Admin\Downloads\sai-kiran.pem"))
+     ```
+     Copy the full output (one long line). Paste into secret.
+   - `EC2_HOST` = `100.53.133.29` (IP only)
    - `EC2_USER` = `ec2-user`
    - `DOCKER_PASSWORD` = Docker Hub token
 
@@ -186,16 +190,13 @@ docker-compose up --build
 
 ## Troubleshooting
 
-**Deploy job fails with "unable to authenticate":**
-- **Key pair must match EC2** – In AWS Console → EC2 → Instance → Details, check "Key pair name". The `.pem` must be from that exact key pair.
-- **EC2_SSH_KEY = raw PEM** – Paste the full .pem content (all lines). Do NOT use base64. Open in Notepad, Select All, Copy, Paste into the secret. If multiline fails, try base64 instead:
-  ```powershell
-  [Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\sai-kiran.pem"))
-  ```
-  Paste the single-line output into `EC2_SSH_KEY` and update the secret.
-- Verify secrets are in **production** environment (Settings → Environments → production)
-- EC2 security group: SSH (22) must allow `0.0.0.0/0`
-- On EC2: ensure `~/studentsinfo/backend/.env` exists with `SUPABASE_URL` and `SUPABASE_KEY`
+**Deploy job fails with "Permission denied (publickey)":**
+- **Verify key fingerprint**: Locally run `ssh-keygen -lf sai-kiran.pem`. The workflow logs show "Key fingerprint: ..." – it must match. If different, the secret has wrong/truncated key.
+- **Use base64** – Avoid multiline corruption. PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("path\to\sai-kiran.pem"))`. Copy the entire output (2300+ chars), no truncation.
+- **Key pair must match EC2** – AWS Console → EC2 → Instance → "Key pair name" must be sai-kiran.
+- **Security group** – Port 22 from `0.0.0.0/0`
+- Secrets in **production** environment
+- On EC2: `~/studentsinfo/backend/.env` with `SUPABASE_URL` and `SUPABASE_KEY`
 
 **Can't access from browser:**
 - Check EC2 security group allows ports 8000 and 3000

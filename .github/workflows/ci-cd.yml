@@ -149,27 +149,45 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup SSH key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
-
       - name: Deploy to EC2 via SSH
         env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
         run: |
           set -e
-          EC2_HOST="$(echo "$EC2_HOST" | tr -d ' \r\n')"
-          EC2_USER="$(echo "$EC2_USER" | tr -d ' \r\n')"
-          if [ -z "$EC2_HOST" ] || [ -z "$EC2_USER" ]; then
-            echo "::error::EC2_HOST and EC2_USER required."
+          EC2_HOST="$(echo "$EC2_HOST" | tr -d ' \r\n\t')"
+          EC2_USER="$(echo "$EC2_USER" | tr -d ' \r\n\t')"
+          if [ -z "$EC2_HOST" ] || [ -z "$EC2_USER" ] || [ -z "$SSH_KEY" ]; then
+            echo "::error::EC2_SSH_KEY, EC2_HOST, EC2_USER required in production secrets."
             exit 1
           fi
+
+          # Decode key: base64 (single-line, no corruption) or raw PEM
+          CLEAN_KEY="$(printf '%s' "$SSH_KEY" | tr -d '\r')"
+          if echo "$CLEAN_KEY" | grep -q "BEGIN.*PRIVATE KEY"; then
+            echo "$CLEAN_KEY" > key.pem
+          else
+            echo "$CLEAN_KEY" | tr -d '\n\t ' | base64 -d > key.pem
+          fi
+          chmod 600 key.pem
+
+          if [ ! -s key.pem ] || ! grep -q "BEGIN.*PRIVATE KEY" key.pem; then
+            echo "::error::EC2_SSH_KEY invalid. Use base64 - see DEPLOYMENT.md"
+            exit 1
+          fi
+          ssh-keygen -y -f key.pem > /dev/null 2>&1 || { echo "::error::EC2_SSH_KEY invalid or wrong key"; exit 1; }
+          echo "Key fingerprint: $(ssh-keygen -lf key.pem | cut -d' ' -f1-2)"
+
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-          ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=30 \
+          echo "Testing SSH connection..."
+          ssh -i key.pem -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=30 -o IdentitiesOnly=yes \
+            "${EC2_USER}@${EC2_HOST}" 'echo OK' || { echo "::error::SSH failed - check key matches EC2 key pair and security group allows port 22"; exit 1; }
+
+          echo "Deploying..."
+          ssh -i key.pem -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=30 -o IdentitiesOnly=yes \
             "${EC2_USER}@${EC2_HOST}" 'bash -s' << 'DEPLOY_SCRIPT'
             set -e
 
