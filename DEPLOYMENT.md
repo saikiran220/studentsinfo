@@ -1,5 +1,21 @@
 # End-to-End Deployment Guide
 
+## Quick Deploy Checklist
+
+1. **GitHub secrets** (Settings → Environments → production):
+   - `EC2_SSH_KEY` = base64 of sai-kiran.pem (PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("path\to\sai-kiran.pem"))`)
+   - `EC2_HOST` = `100.53.133.29`
+   - `EC2_USER` = `ec2-user`
+   - `DOCKER_PASSWORD` = Docker Hub token
+
+2. **EC2**: Create `~/studentsinfo/backend/.env` with `SUPABASE_URL` and `SUPABASE_KEY`
+
+3. **EC2 Security Group**: Allow SSH (22), 8000, 3000 from `0.0.0.0/0`
+
+4. **Push**: `git push origin main`
+
+---
+
 ## Workflow Overview
 
 ```
